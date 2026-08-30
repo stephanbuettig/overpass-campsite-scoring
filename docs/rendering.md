@@ -66,11 +66,11 @@ Quality classes, resolved from `camp_site` first and `stars` second:
 
 | Class | Colour | From `camp_site` | From `stars` |
 |---|---|---|---|
-| 0 | `#2563C9` blue | `deluxe` | 4, 4.5, 5 |
-| 1 | `#2E9E52` green | `serviced` | 3, 3.5 |
+| 0 | `#2563C9` blue | `deluxe` | 4, 4S, 4.5, 5, 5S, 5.5 |
+| 1 | `#2E9E52` green | `serviced` | 3, 3S, 3.5 |
 | 2 | `#A03CB0` purple | `glamping` | — |
-| 3 | `#E8A33D` orange | `standard` | 2, 2.5 |
-| 4 | `#D4562B` red | `basic` | 1, 1.5 |
+| 3 | `#E8A33D` orange | `standard` | 2, 2S, 2.5 |
+| 4 | `#D4562B` red | `basic` | 1, 1S, 1.5 |
 | 5 | `#7A8794` grey | `pitch`, `camp_pitch` | — |
 | 6 | `#9AA5B1` pale grey | nothing | nothing |
 
@@ -143,7 +143,7 @@ Two facts this depends on, both verified rather than assumed:
 - `navigator.language` **is available inside the worker** where Ultra runs the transform, and matches the browser. A Playwright locale override does not reach the worker, which produced a misleading first measurement; the real browser was checked afterwards.
 - LiquidJS `assign` inside a `case` block **leaks to the outer scope**, so the labels can be declared once at the top and used everywhere below.
 
-37 labels × 5 languages costs 8118 characters in the file and 3688 in the shareable link. Per feature the cost is a single two letter property.
+38 `assign` statements × 5 languages, 37 labels plus the decimal separator, cost 7223 characters in the file and 3166 in the shareable link, both measured. Per feature the cost is a single two letter property.
 
 Place names are never translated. OSM `name` is the local name, which is what is written on the sign at the entrance.
 

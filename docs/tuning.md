@@ -100,7 +100,7 @@ Keep the ramp inside the min/max window or a layer will pop.
 
 ## Change the marker sizes
 
-`P` at the top of the size expressions defines three zoom stops as `(zoom, size at score 0, size at score 100, minimum for rated places)`. Star and digit derive from it automatically. Sprites are 36 px at `icon-size: 1.0`.
+The sizes are written out as literal `interpolate` expressions in the style, three zoom stops each, of the form `(zoom, size at score 0, size at score 100, minimum for rated places)`. Change `camp-dot` and the star badge and the digit follow, because `camp-star` is 2.05 × the dot and `camp-stars` is 16.9 × the icon size. Sprites are 36 px at `icon-size: 1.0`, so `0.30` renders 11 px.
 
 ## Change the card language
 
@@ -109,7 +109,7 @@ var UI = 'auto';   // follows the browser
 var UI = 'de';     // de, en, fr, es, it
 ```
 
-Adding a sixth language means one `{%- when 'xx' -%}` block in the template with 37 `assign` statements, and adding the code to `UI_LANGS` in the transform. The body of the template does not change at all.
+Adding a sixth language means one `{%- when 'xx' -%}` block in the template with 38 `assign` statements, 37 labels plus `T_dec` for the decimal separator, and adding the code to `UI_LANGS` in the transform. The body of the template does not change at all.
 
 ## Hover card or pinned card
 

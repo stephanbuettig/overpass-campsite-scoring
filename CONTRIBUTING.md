@@ -20,11 +20,11 @@ Issues and pull requests are welcome. The project is one file plus its documenta
 **Rebuild the link** if you changed the file:
 
 ```bash
-npm install lz-string
-node tools/make-link.mjs
+npm install
+node tools/make-link.mjs --write
 ```
 
-and update the two reference links at the bottom of the README.
+`--write` patches the links in the README in place. They are inline links, not reference definitions, and there is nothing left at the bottom of the file to edit by hand.
 
 ## What makes a good change
 
