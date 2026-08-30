@@ -23,7 +23,7 @@ Two buttons sit [at the top of this page](https://github.com/stephanbuettig/over
 | Button | What you get |
 |---|---|
 | [**▶ open the map**](https://github.com/stephanbuettig/overpass-campsite-scoring/tree/main#campsite-scoring), the green one | The finished map, runs immediately, no editor in the way |
-| [**edit the source**](https://github.com/stephanbuettig/overpass-campsite-scoring/tree/main#campsite-scoring), the grey one | The same map with the source in the left sidebar, ready to modify |
+| [**#️⃣ edit the source**](https://github.com/stephanbuettig/overpass-campsite-scoring/tree/main#campsite-scoring), the grey one | The same map with the source in the left sidebar, ready to modify |
 
 Both carry the whole document inside the URL fragment. Nothing is uploaded anywhere, the fragment never leaves your browser. Pan and zoom, the query re-runs for the new view.
 
