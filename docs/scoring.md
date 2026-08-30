@@ -34,6 +34,8 @@ Distances are measured from **every support point of the site geometry**, so a P
 | `gas` | Eating out | 18 | `#C77400` | 200 m | 500 m | 1000 m |
 | `att` | Attractions | 12 | `#0d7a52` | 250 m | 550 m | 1000 m |
 
+The four ring sets drawn to the same scale: [README, how the score works](../README.md#how-the-score-works).
+
 Colours are the OSM Carto values for amenity brown, shop purple, gastronomy orange and leisure green, read out of `style/amenity-points.mss`. They are the colours people already associate with those things on the standard OSM map.
 
 ### Which tags count

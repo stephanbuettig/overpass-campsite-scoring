@@ -15,7 +15,10 @@ All notable changes to this project.
 - The file tree in the README omitted `tools/verify.mjs`, `CHANGELOG.md`, `CONTRIBUTING.md`, `LICENSE` and `package.json`.
 
 ### Added
-- Colour legend and size legend in the README body, with the hex values, the tags each colour comes from, and the pixel sizes at score 0 and score 100.
+- Three legend graphics in the README, rendered from the real sprite sheets at true scale. `images/legend-colours.png` shows the seven quality classes as actual colour, `images/legend-sizes.png` shows the markers at their real pixel size from score 0 to score 100, `images/legend-rings.png` draws the four categories' distance rings to a common scale.
+
+### Changed
+- The two long one click URLs now appear exactly once each, on the buttons at the top. Everything else in the README links to `…/tree/main#campsite-scoring`, which is the buttons themselves. The file dropped from 179 KB to 69 KB.
 
 ## v3.0.1 — 2026-08-30
 

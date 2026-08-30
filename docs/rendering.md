@@ -41,6 +41,8 @@ Dot and tent therefore never appear at full strength together, which was the ori
 
 ## Sizes
 
+Every size below is drawn at true scale in the README, [what the size means](../README.md#legend-what-the-size-means).
+
 Sprites are 36 × 36 px, so `icon-size: 1.0` renders 36 px on screen. The dot uses a nested expression, zoom outside and score inside:
 
 ```yaml
@@ -62,7 +64,7 @@ Three things are happening in there:
 
 ## Colours
 
-Quality classes, resolved from `camp_site` first and `stars` second:
+Quality classes, resolved from `camp_site` first and `stars` second. The rendered swatches are in the README, [what the colour means](../README.md#legend-what-the-colour-means).
 
 | Class | Colour | From `camp_site` | From `stars` |
 |---|---|---|---|
