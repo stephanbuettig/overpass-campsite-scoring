@@ -131,11 +131,15 @@ Note the trailing `/api/`, Ultra appends `interpreter` itself. If you run your o
 ## Rebuild the one click link
 
 ```bash
-npm install lz-string
-node tools/make-link.mjs 11.00 56.0000 8.2000
+npm install
+node tools/make-link.mjs --write          # rebuild and patch README.md
+node tools/make-link.mjs 12.5 47.8 12.1   # different start view, print only
 ```
 
-Prints both the map-only and the editor URL. Run it after every edit, otherwise the link in the README still carries the old document.
+Run it after every edit, otherwise the links in the README still carry the old document.
+
+> [!IMPORTANT]
+> The links in the README are **inline**, not Markdown reference definitions. GitHub renders with cmark-gfm, which stops expanding reference links once roughly 85 000 characters of link destinations have been produced for one document. With a 28 000 character URL that is three uses; every further one is left on the page as literal `[text][label]`. Inline links have no such budget. Measured against cmark-gfm, not assumed.
 
 ## Checks worth running after an edit
 

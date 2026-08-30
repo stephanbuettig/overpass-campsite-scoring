@@ -2,6 +2,12 @@
 
 All notable changes to this project.
 
+## v3.0.1 — 2026-08-30
+
+### Fixed
+- Four of the eight one click links rendered on GitHub as literal `[text][label]` instead of links. GitHub renders with cmark-gfm, which stops expanding Markdown **reference** links once roughly 85 000 characters of destinations have been produced for one document. At 28 000 characters per URL that is three uses. The links are now inline, which has no such budget, and the README uses four of them instead of eight.
+- `tools/make-link.mjs --write` now patches the README in place, so the links cannot fall out of sync with the map after an edit.
+
 ## v3 — 2026-08-30
 
 The version in this repository.
