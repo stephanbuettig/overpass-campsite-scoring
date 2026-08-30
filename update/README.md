@@ -6,7 +6,7 @@ An [Overpass Ultra][ultra] map that scores every campsite and motorhome pitch in
 
 [![Open the map][badge-map]][map] [![Open in the editor][badge-edit]][editor] [![License: MIT](https://img.shields.io/badge/code-MIT-blue)](LICENSE) [![Data: ODbL](https://img.shields.io/badge/data-ODbL-brightgreen)](https://www.openstreetmap.org/copyright)
 
-![A campsite with its matched points of interest](images/hero.png)
+[![Hvide Sande harbour, three pitches with their matched points of interest](images/hero.png)][map]
 
 ---
 
@@ -28,9 +28,13 @@ Both links carry the whole document inside the URL fragment. Nothing is uploaded
 > [!TIP]
 > The map starts on the Danish west coast. Drag it anywhere in the world, the query follows.
 
+[![All 2049 campsites and motorhome pitches in Denmark, scored](images/map-example.png)][editor]
+
+Denmark in one view. 2049 campsites and motorhome pitches, 15 558 points of interest scored against them, one query. Blue is a deluxe site or four to five stars, green comfort, orange standard, red basic, grey unknown. The size is the score. **Click the picture** to open exactly this view with the source next to it.
+
 ## What you see
 
-![The four zoom stages](images/zoom-stages.png)
+[![The four zoom stages](images/zoom-stages.png)][editor]
 
 | Zoom | What is drawn |
 |---|---|

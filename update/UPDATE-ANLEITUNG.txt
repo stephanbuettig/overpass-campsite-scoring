@@ -1,0 +1,24 @@
+Bilder und README aktualisieren
+===============================
+
+Geaendert haben sich nur das README und die Bilder. Alles andere
+bleibt wie es ist.
+
+1. Den Inhalt dieses Ordners in Ihren Repository-Ordner kopieren
+   und dabei ueberschreiben. Das sind
+
+       README.md
+       images\hero.png
+       images\map-example.png     (neu)
+       images\zoom-stages.png
+       images\info-cards.png
+       images\languages.png
+
+2. Eingabeaufforderung im Repository-Ordner oeffnen und tippen
+
+       git add -A
+       git commit -m "Screenshots on the real basemap, and a Denmark wide example"
+       git push
+
+3. Kontrolle auf
+   https://github.com/stephanbuettig/overpass-campsite-scoring
