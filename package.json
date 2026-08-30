@@ -1,0 +1,18 @@
+{
+  "name": "overpass-campsite-scoring",
+  "version": "3.0.0",
+  "description": "An Overpass Ultra map that scores campsites and motorhome pitches by what is within walking distance",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "verify": "node tools/verify.mjs",
+    "link": "node tools/make-link.mjs"
+  },
+  "devDependencies": {
+    "@maplibre/maplibre-gl-style-spec": "^26.4.1",
+    "js-yaml": "^5.4.1",
+    "lz-string": "^1.5.0",
+    "osm2geojson-ultra": "^4.0.1"
+  }
+}

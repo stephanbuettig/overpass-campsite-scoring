@@ -1,0 +1,796 @@
+---
+# ==================================================================
+#  CAMPSITE SCORING  v3
+#  Overpass Ultra map that ranks campsites and motorhome pitches
+#  by what is actually within walking distance.
+# ==================================================================
+#
+#  WHAT THE MAP SHOWS
+#  Every campsite and caravan site gets points for what surrounds
+#  it. Four categories, weighted by importance, adding up to
+#  exactly 100. The score drives the marker size, the quality
+#  class drives the colour. Nothing is filtered away, weak places
+#  simply become small dots.
+#
+#  CATEGORIES, maximum points and distance rings
+#    san  45 pts  brown   #734a08  sanitary
+#         full below 150 m, 60 % below 350 m, 30 % below 600 m
+#    ver  25 pts  purple  #ac39ac  food supply
+#         full below 150 m, 60 % below 400 m, 30 % below 1000 m
+#    gas  18 pts  orange  #C77400  eating out
+#         full below 200 m, 60 % below 500 m, 30 % below 1000 m
+#    att  12 pts  green   #0d7a52  attractions
+#         full below 250 m, 60 % below 550 m, 30 % below 1000 m
+#  The three nearest hits per category count. Three full hits give
+#  the category maximum. Everything above is capped.
+#
+#  ZOOM STAGING
+#    up to 12.3   dot sized by score. Where a star rating exists,
+#                 a star badge behind it with the count as a digit.
+#                 The digit scales with the dot.
+#    12.3 to 12.7 cross fade
+#    from 12.7    tent, name, camp outline and the matched POI
+#  Dot and tent never appear at the same time.
+#
+#  COLOURS by quality class, from camp_site and stars
+#    #2563C9 blue      deluxe, 4 to 5 stars
+#    #2E9E52 green     serviced, 3 to 3.5 stars
+#    #A03CB0 purple    glamping
+#    #E8A33D orange    standard, 2 to 2.5 stars
+#    #D4562B red       basic, 1 to 1.5 stars
+#    #7A8794 grey      pitch, camp_pitch
+#    #9AA5B1 pale grey no information
+#  Better classes are drawn on top. Category colours are taken
+#  from the OSM Carto source, verified in amenity-points.mss.
+#
+#  DRAWING ORDER IN THE DETAIL VIEW
+#  Camp area, outline, white disc, tent, then the POI, labels on
+#  top. The POI therefore sit above area and tent.
+#
+#  TAG VALUES VERIFIED AGAINST TAGINFO
+#  These do NOT exist and appear nowhere in this document:
+#    leisure=minigolf         correct is leisure=miniature_golf
+#    leisure=arcade           correct is leisure=amusement_arcade
+#    amenity=convenience_store  correct is shop=convenience
+#    amenity=swimming_pool, shop=hypermarket, shop=delicatessen
+#    amenity=dishwashing      the key has 5 uses worldwide
+#  Deliberately excluded:
+#    leisure=swimming_pool    3.0 M uses, 59.5 % access=private.
+#                             Those are garden pools, not an offer.
+#    leisure=pitch            2.8 M uses, every ball court, too vague
+#    shop=clothes, mall, department_store, wholesale
+#                             not food supply
+#
+#  MEASURED over eight regions, 1084 places, 10696 POI
+#    Region            places  p25  median  p75  max
+#    Lake Garda           122   43      65   83   97
+#    Baltic Sea Ruegen     65   36      60   75  100
+#    Mueritz              110   25      48   68   95
+#    Bernese Oberland      61   24      45   64   88
+#    Denmark West coast   122    9      31   45   93
+#    Eifel                138   14      30   55   95
+#    Provence coast       188   15      26   49  100
+#    Zealand              278    3      15   30   88
+#  The spread between regions is real. Zealand contains hundreds
+#  of primitive Danish shelter sites with no facilities at all,
+#  and they correctly score zero.
+#
+#  PERFORMANCE, median of three runs against openstreetmap.fr
+#    Region             before   now    factor
+#    Denmark West coast   3.1 s  2.4 s   1.3
+#    Lake Garda           3.7 s  2.9 s   1.3
+#    Zealand             12.0 s 10.1 s   1.2
+#  Where the time goes, measured on the Zealand extent
+#    network round trip                         0.24 s
+#    server floor, even for an empty query       1.1 s
+#    fetching the camps                          1.6 s
+#    around filter for the POI                   2.5 s
+#    serialising and transferring 754 KB         4.7 s
+#    browser, JSON.parse plus osm2geojson plus
+#    scoring, all together                       0.09 s
+#  The browser is not the bottleneck. A query returning nine
+#  objects already costs 1.3 seconds on this server. That is the
+#  floor, and no amount of query tuning goes below it.
+#
+#  MEASURED AND REJECTED
+#    three separate key queries          12.0 instead of 5.5 s
+#    around directly on the camp areas   10.9 instead of 5.5 s
+#    regex instead of a value union       3.8 instead of 2.9 s
+#    radius 600 instead of 1000 m         no difference
+#    per statement bbox instead of global no difference
+#    raw out center instead of convert    318 instead of 208 B per POI
+#    XML instead of JSON                  667 instead of 754 KB, but
+#                                         no reliable time gain
+#    a different server                   openstreetmap.fr 3.1 s,
+#                                         overpass-api.de 3.4 s and
+#                                         12 to 22 s plus HTTP 429 on
+#                                         the large query
+#
+#  CATEGORY WHEN AN OBJECT CARRIES SEVERAL TAGS
+#  An object with shop=bakery AND amenity=cafe belongs to two
+#  categories but is drawn once. The output order decides, the
+#  last statement wins. It reads attraction, eating out, supply,
+#  sanitary, so the more important category wins.
+#
+#  QUERY LENGTH  2031 characters raw, 2847 URL encoded. The
+#  practical GET limit is around 8000, so HTTP 414 is far away.
+#
+#  LANGUAGE OF THE INFO CARD
+#  The card speaks German, English, French, Spanish and Italian. The
+#  transform reads navigator.language and writes the result onto every
+#  feature, the template carries all five label sets and picks one.
+#  Verified inside Ultra's worker: navigator.language is available there
+#  and matches the browser.
+#    var UI = 'auto';   follows the browser, unknown falls back to English
+#    var UI = 'de';     forces one language
+#  Only the card is translated. Place names come from OpenStreetMap and
+#  stay in the local language, which is what a traveller wants on a map.
+#  Cost of the five language table: 8118 characters in this file, 3688 in
+#  the shareable link.
+#
+#  MOUSE OVER AND CLICK
+#  Ultra routes hover and click through the same handler with the
+#  same template. With popupOnHover the card follows the cursor and
+#  survives moving into it, but a click cannot pin it. Set
+#  popupOnHover to false for the pinned card without hover. There
+#  is no way to have both.
+#
+#  Map data from OpenStreetMap, licensed ODbL.
+#  Full documentation at
+#  https://github.com/stephanbuettig/overpass-campsite-scoring
+#
+server: https://overpass.openstreetmap.fr/api/
+popupOnHover: true
+popupTemplate: |
+  {%- comment -%}Card language. The transform writes tags.lg from the browser or
+  from the UI setting at the top of the transform. Unknown falls back to English.
+  {%- endcomment -%}
+  {%- case tags.lg -%}
+  {%- when 'de' -%}
+  {%- assign T_dec = ',' -%}
+  {%- assign T_san = 'Sanitär' -%}{%- assign T_ver = 'Versorgung' -%}{%- assign T_gas = 'Gastronomie' -%}
+  {%- assign T_att = 'Attraktion' -%}{%- assign T_place = 'Camping- oder Stellplatz' -%}{%- assign T_star = 'Stern' -%}
+  {%- assign T_stars = 'Sterne' -%}{%- assign T_nocaravan = 'Keine Wohnwagen' -%}{%- assign T_notent = 'Keine Zelte' -%}
+  {%- assign T_nodog = 'Keine Hunde' -%}{%- assign T_private = 'Privat' -%}{%- assign T_caravan = 'Wohnwagen' -%}
+  {%- assign T_tent = 'Zelte' -%}{%- assign T_free = 'Kostenfrei' -%}{%- assign T_campsite = 'Campingplatz' -%}
+  {%- assign T_pitchsite = 'Wohnmobilstellplatz' -%}{%- assign T_basic = 'Einfach' -%}{%- assign T_standard = 'Standard' -%}
+  {%- assign T_serviced = 'Komfort' -%}{%- assign T_deluxe = 'Deluxe' -%}{%- assign T_glamping = 'Glamping' -%}
+  {%- assign T_single = 'Einzelstellplatz' -%}{%- assign T_wild = 'Naturlager' -%}{%- assign T_wc = 'WC' -%}
+  {%- assign T_shower = 'Dusche' -%}{%- assign T_water = 'Trinkwasser' -%}{%- assign T_dump = 'Entsorgung' -%}
+  {%- assign T_power = 'Strom' -%}{%- assign T_wifi = 'WLAN' -%}{%- assign T_internet = 'Internet' -%}
+  {%- assign T_dogs = 'Hunde' -%}{%- assign T_leashed = 'angeleint' -%}{%- assign T_pitches = 'Plätze' -%}
+  {%- assign T_paid = 'Kostenpflichtig' -%}{%- assign T_route = 'Route' -%}{%- assign T_website = 'Website' -%}
+  {%- assign T_email = 'E-Mail' -%}
+  {%- when 'fr' -%}
+  {%- assign T_dec = ',' -%}
+  {%- assign T_san = 'Sanitaires' -%}{%- assign T_ver = 'Ravitaillement' -%}{%- assign T_gas = 'Restauration' -%}
+  {%- assign T_att = 'Loisirs' -%}{%- assign T_place = 'Camping ou aire' -%}{%- assign T_star = 'étoile' -%}
+  {%- assign T_stars = 'étoiles' -%}{%- assign T_nocaravan = 'Caravanes interdites' -%}{%- assign T_notent = 'Tentes interdites' -%}
+  {%- assign T_nodog = 'Chiens interdits' -%}{%- assign T_private = 'Privé' -%}{%- assign T_caravan = 'Caravanes' -%}
+  {%- assign T_tent = 'Tentes' -%}{%- assign T_free = 'Gratuit' -%}{%- assign T_campsite = 'Camping' -%}
+  {%- assign T_pitchsite = 'Aire de camping-car' -%}{%- assign T_basic = 'Simple' -%}{%- assign T_standard = 'Standard' -%}
+  {%- assign T_serviced = 'Confort' -%}{%- assign T_deluxe = 'Deluxe' -%}{%- assign T_glamping = 'Glamping' -%}
+  {%- assign T_single = 'Emplacement seul' -%}{%- assign T_wild = 'Camping nature' -%}{%- assign T_wc = 'Toilettes' -%}
+  {%- assign T_shower = 'Douche' -%}{%- assign T_water = 'Eau potable' -%}{%- assign T_dump = 'Vidange' -%}
+  {%- assign T_power = 'Électricité' -%}{%- assign T_wifi = 'Wi-Fi' -%}{%- assign T_internet = 'Internet' -%}
+  {%- assign T_dogs = 'Chiens' -%}{%- assign T_leashed = 'en laisse' -%}{%- assign T_pitches = 'emplacements' -%}
+  {%- assign T_paid = 'Payant' -%}{%- assign T_route = 'Itinéraire' -%}{%- assign T_website = 'Site web' -%}
+  {%- assign T_email = 'E-mail' -%}
+  {%- when 'es' -%}
+  {%- assign T_dec = ',' -%}
+  {%- assign T_san = 'Sanitarios' -%}{%- assign T_ver = 'Alimentación' -%}{%- assign T_gas = 'Restauración' -%}
+  {%- assign T_att = 'Ocio' -%}{%- assign T_place = 'Camping o área' -%}{%- assign T_star = 'estrella' -%}
+  {%- assign T_stars = 'estrellas' -%}{%- assign T_nocaravan = 'Sin caravanas' -%}{%- assign T_notent = 'Sin tiendas' -%}
+  {%- assign T_nodog = 'Sin perros' -%}{%- assign T_private = 'Privado' -%}{%- assign T_caravan = 'Caravanas' -%}
+  {%- assign T_tent = 'Tiendas' -%}{%- assign T_free = 'Gratuito' -%}{%- assign T_campsite = 'Camping' -%}
+  {%- assign T_pitchsite = 'Área de autocaravanas' -%}{%- assign T_basic = 'Básico' -%}{%- assign T_standard = 'Estándar' -%}
+  {%- assign T_serviced = 'Confort' -%}{%- assign T_deluxe = 'Deluxe' -%}{%- assign T_glamping = 'Glamping' -%}
+  {%- assign T_single = 'Parcela individual' -%}{%- assign T_wild = 'Camping natural' -%}{%- assign T_wc = 'Aseos' -%}
+  {%- assign T_shower = 'Ducha' -%}{%- assign T_water = 'Agua potable' -%}{%- assign T_dump = 'Vaciado' -%}
+  {%- assign T_power = 'Electricidad' -%}{%- assign T_wifi = 'Wi-Fi' -%}{%- assign T_internet = 'Internet' -%}
+  {%- assign T_dogs = 'Perros' -%}{%- assign T_leashed = 'con correa' -%}{%- assign T_pitches = 'parcelas' -%}
+  {%- assign T_paid = 'De pago' -%}{%- assign T_route = 'Cómo llegar' -%}{%- assign T_website = 'Sitio web' -%}
+  {%- assign T_email = 'Correo' -%}
+  {%- when 'it' -%}
+  {%- assign T_dec = ',' -%}
+  {%- assign T_san = 'Servizi igienici' -%}{%- assign T_ver = 'Alimentari' -%}{%- assign T_gas = 'Ristorazione' -%}
+  {%- assign T_att = 'Attrazioni' -%}{%- assign T_place = 'Campeggio o area' -%}{%- assign T_star = 'stella' -%}
+  {%- assign T_stars = 'stelle' -%}{%- assign T_nocaravan = 'No caravan' -%}{%- assign T_notent = 'No tende' -%}
+  {%- assign T_nodog = 'No cani' -%}{%- assign T_private = 'Privato' -%}{%- assign T_caravan = 'Caravan' -%}
+  {%- assign T_tent = 'Tende' -%}{%- assign T_free = 'Gratuito' -%}{%- assign T_campsite = 'Campeggio' -%}
+  {%- assign T_pitchsite = 'Area camper' -%}{%- assign T_basic = 'Base' -%}{%- assign T_standard = 'Standard' -%}
+  {%- assign T_serviced = 'Comfort' -%}{%- assign T_deluxe = 'Deluxe' -%}{%- assign T_glamping = 'Glamping' -%}
+  {%- assign T_single = 'Piazzola singola' -%}{%- assign T_wild = 'Campeggio libero' -%}{%- assign T_wc = 'Servizi' -%}
+  {%- assign T_shower = 'Doccia' -%}{%- assign T_water = 'Acqua potabile' -%}{%- assign T_dump = 'Scarico' -%}
+  {%- assign T_power = 'Corrente' -%}{%- assign T_wifi = 'Wi-Fi' -%}{%- assign T_internet = 'Internet' -%}
+  {%- assign T_dogs = 'Cani' -%}{%- assign T_leashed = 'al guinzaglio' -%}{%- assign T_pitches = 'piazzole' -%}
+  {%- assign T_paid = 'A pagamento' -%}{%- assign T_route = 'Percorso' -%}{%- assign T_website = 'Sito web' -%}
+  {%- assign T_email = 'E-mail' -%}
+  {%- else -%}
+  {%- assign T_dec = '.' -%}
+  {%- assign T_san = 'Sanitary' -%}{%- assign T_ver = 'Food supply' -%}{%- assign T_gas = 'Eating out' -%}
+  {%- assign T_att = 'Attractions' -%}{%- assign T_place = 'Campsite or pitch' -%}{%- assign T_star = 'star' -%}
+  {%- assign T_stars = 'stars' -%}{%- assign T_nocaravan = 'No caravans' -%}{%- assign T_notent = 'No tents' -%}
+  {%- assign T_nodog = 'No dogs' -%}{%- assign T_private = 'Private' -%}{%- assign T_caravan = 'Caravans' -%}
+  {%- assign T_tent = 'Tents' -%}{%- assign T_free = 'Free of charge' -%}{%- assign T_campsite = 'Campsite' -%}
+  {%- assign T_pitchsite = 'Motorhome pitch' -%}{%- assign T_basic = 'Basic' -%}{%- assign T_standard = 'Standard' -%}
+  {%- assign T_serviced = 'Comfort' -%}{%- assign T_deluxe = 'Deluxe' -%}{%- assign T_glamping = 'Glamping' -%}
+  {%- assign T_single = 'Single pitch' -%}{%- assign T_wild = 'Wild camping' -%}{%- assign T_wc = 'Toilets' -%}
+  {%- assign T_shower = 'Shower' -%}{%- assign T_water = 'Drinking water' -%}{%- assign T_dump = 'Dump station' -%}
+  {%- assign T_power = 'Power' -%}{%- assign T_wifi = 'Wi-Fi' -%}{%- assign T_internet = 'Internet' -%}
+  {%- assign T_dogs = 'Dogs' -%}{%- assign T_leashed = 'on a lead' -%}{%- assign T_pitches = 'pitches' -%}
+  {%- assign T_paid = 'Paid' -%}{%- assign T_route = 'Directions' -%}{%- assign T_website = 'Website' -%}
+  {%- assign T_email = 'Email' -%}
+  {%- endcase -%}
+  {%- assign chip = 'background:#eef1f4; border-radius:9px; padding:2px 7px; white-space:nowrap;' -%}
+  {%- assign chipJa = 'background:#e4f2e8; border-radius:9px; padding:2px 7px; white-space:nowrap;' -%}
+  {%- assign chipNein = 'background:#fbe3dc; color:#9c3316; border-radius:9px; padding:2px 7px; white-space:nowrap;' -%}
+  {%- assign chipStern = 'background:#fff4d6; border-radius:9px; padding:2px 7px; white-space:nowrap;' -%}
+  {%- assign link = 'color:#0066cc; text-decoration:none;' -%}
+  {%- assign linkGrau = 'color:#8a94a0; text-decoration:none;' -%}
+  {%- assign u = 'text-decoration:underline;' -%}
+  {%- assign gmaps = 'https://www.google.com/maps/search/?api=1&amp;query=' -%}
+  {% if tags.c %}
+  <div style="font-family:sans-serif; min-width:160px; max-width:250px; font-size:12px;">
+    <div style="font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:2px;
+      color:{% if tags.c == "san" %}#734a08{% elsif tags.c == "ver" %}#ac39ac{% elsif tags.c == "gas" %}#C77400{% else %}#0d7a52{% endif %};">
+      {% if tags.c == "san" %}{{T_san}}{% elsif tags.c == "ver" %}{{T_ver}}{% elsif tags.c == "gas" %}{{T_gas}}{% else %}{{T_att}}{% endif %}
+    </div>
+    <div style="font-weight:700; color:#1c2b3a; font-size:14px;">{{tags.n | default: tags.v}}</div>
+    <div style="color:#777; font-size:11px; margin-top:1px;">{{tags.v}}</div>
+    {% if tags.opening_hours %}<div style="margin-top:4px; color:#555;">🕐&nbsp;{{tags.opening_hours}}</div>{% endif %}
+    <div style="margin-top:6px; padding-top:5px; border-top:1px solid #e2e6ea; font-size:11px;">
+      <a href="{{gmaps}}{{tags.nav_lat}},{{tags.nav_lon}}" target="_blank" style="{{link}}">🧭&nbsp;<span style="{{u}}">{{T_route}}</span></a> &nbsp;
+      <a href="https://www.openstreetmap.org/{{type}}/{{id}}" target="_blank" style="{{linkGrau}}">🗺️&nbsp;<span style="{{u}}">OSM</span></a>
+    </div>
+  </div>
+  {% elsif tags.tourism == "camp_site" or tags.tourism == "caravan_site" %}
+  <div style="max-width:320px; font-family:sans-serif; font-size:12px;">
+    <div style="font-weight:700; font-size:15px; color:#1c2b3a; line-height:1.3;">
+      <span style="margin-right:3px;">{% if tags.kind == "motorhome" %}🚐{% elsif tags.kind == "tent" %}⛺{% elsif tags.kind == "wild" %}🌲{% else %}🏕️{% endif %}</span>{{tags.name | default: T_place}}
+      <span style="color:{{tags.col}}; white-space:nowrap;">({{tags.score}}/100)</span>
+    </div>
+    <div style="height:3px; background:{{tags.col}}; border-radius:2px; margin:5px 0 7px 0;"></div>
+    <div style="height:8px; background:#e2e6ea; border-radius:4px; overflow:hidden; display:flex;">
+      <div style="width:{{tags.score_san}}%; background:#734a08;"></div>
+      <div style="width:{{tags.score_ver}}%; background:#ac39ac;"></div>
+      <div style="width:{{tags.score_gas}}%; background:#C77400;"></div>
+      <div style="width:{{tags.score_att}}%; background:#0d7a52;"></div>
+    </div>
+    <table style="width:100%; font-size:10.5px; color:#666; margin-top:5px; border-collapse:collapse;">
+      <tr><td style="padding:1px 0;"><span style="color:#734a08;">&#9632;</span>&nbsp;{{T_san}} <b>{{tags.score_san | replace: ".", T_dec}}</b>/45</td>
+          <td style="padding:1px 0;"><span style="color:#ac39ac;">&#9632;</span>&nbsp;{{T_ver}} <b>{{tags.score_ver | replace: ".", T_dec}}</b>/25</td></tr>
+      <tr><td style="padding:1px 0;"><span style="color:#C77400;">&#9632;</span>&nbsp;{{T_gas}} <b>{{tags.score_gas | replace: ".", T_dec}}</b>/18</td>
+          <td style="padding:1px 0;"><span style="color:#0d7a52;">&#9632;</span>&nbsp;{{T_att}} <b>{{tags.score_att | replace: ".", T_dec}}</b>/12</td></tr>
+    </table>
+    <div style="margin-top:8px; line-height:2.1;">
+      {%- comment -%} 1. stars  2. red exclusions  3. green confirmations  4. grey facts {%- endcomment -%}
+      {% if tags.st %}<span style="{{chipStern}}">⭐&nbsp;{{tags.st}} {% if tags.st == "1" %}{{T_star}}{% else %}{{T_stars}}{% endif %}</span>{% endif %}
+      {% if tags.caravans == "no" %}<span style="{{chipNein}}">⚠️&nbsp;{{T_nocaravan}}</span>{% endif %}
+      {% if tags.tents == "no" %}<span style="{{chipNein}}">⚠️&nbsp;{{T_notent}}</span>{% endif %}
+      {% if tags.dog == "no" %}<span style="{{chipNein}}">⚠️&nbsp;{{T_nodog}}</span>{% endif %}
+      {% if tags.access == "private" %}<span style="{{chipNein}}">⚠️&nbsp;{{T_private}}</span>{% endif %}
+      {% if tags.caravans and tags.caravans != "no" %}<span style="{{chipJa}}">✅&nbsp;{{T_caravan}}</span>{% endif %}
+      {% if tags.tents and tags.tents != "no" %}<span style="{{chipJa}}">✅&nbsp;{{T_tent}}</span>{% endif %}
+      {% if tags.fee == "no" %}<span style="{{chipJa}}">✅&nbsp;{{T_free}}</span>{% endif %}
+      <span style="{{chip}}">{% if tags.tourism == "camp_site" %}{{T_campsite}}{% else %}{{T_pitchsite}}{% endif %}</span>
+      {% if tags.camp_site %}<span style="{{chip}}">{% if tags.camp_site == "basic" %}{{T_basic}}{% elsif tags.camp_site == "standard" %}{{T_standard}}{% elsif tags.camp_site == "serviced" %}{{T_serviced}}{% elsif tags.camp_site == "deluxe" %}{{T_deluxe}}{% elsif tags.camp_site == "glamping" %}{{T_glamping}}{% elsif tags.camp_site == "pitch" or tags.camp_site == "camp_pitch" %}{{T_single}}{% else %}{{tags.camp_site}}{% endif %}</span>{% endif %}
+      {% if tags.backcountry == "yes" %}<span style="{{chip}}">{{T_wild}}</span>{% endif %}
+      {% if tags.toilets %}<span style="{{chip}}">{{T_wc}}</span>{% endif %}
+      {% if tags.shower %}<span style="{{chip}}">{{T_shower}}</span>{% endif %}
+      {% if tags.drinking_water %}<span style="{{chip}}">{{T_water}}</span>{% endif %}
+      {% if tags.sanitary_dump_station %}<span style="{{chip}}">{{T_dump}}</span>{% endif %}
+      {% if tags.power_supply %}<span style="{{chip}}">{{T_power}}</span>{% endif %}
+      {% if tags.internet_access %}<span style="{{chip}}">{% if tags.internet_access == "wlan" %}{{T_wifi}}{% else %}{{T_internet}}{% endif %}</span>{% endif %}
+      {% if tags.dog and tags.dog != "no" %}<span style="{{chip}}">{{T_dogs}}{% if tags.dog == "leashed" %} {{T_leashed}}{% endif %}</span>{% endif %}
+      {% if tags.capacity %}<span style="{{chip}}">{{tags.capacity}} {{T_pitches}}</span>{% endif %}
+      {% if tags.charge %}<span style="{{chip}}">{{tags.charge}}</span>{% elsif tags.fee == "yes" %}<span style="{{chip}}">{{T_paid}}</span>{% endif %}
+    </div>
+    {% if tags.opening_hours %}<div style="margin-top:7px; color:#555;">🕐&nbsp;{{tags.opening_hours}}</div>{% endif %}
+    {% if tags.operator %}<div style="margin-top:5px; color:#777; font-size:11px;">🏢&nbsp;{{tags.operator}}</div>{% endif %}
+    <div style="margin-top:5px; color:#777; font-size:11px;">
+      📍&nbsp;<a href="{{gmaps}}{{tags.nav_lat}},{{tags.nav_lon}}" target="_blank" style="{{link}}{{u}}">{% if tags["addr:street"] or tags["addr:city"] %}{{tags["addr:street"]}} {{tags["addr:housenumber"]}}{% if tags["addr:street"] and tags["addr:city"] %}, {% endif %}{{tags["addr:postcode"]}} {{tags["addr:city"]}}{% else %}{{tags.nav_lat | round: 5}} / {{tags.nav_lon | round: 5}}{% endif %}</a>
+    </div>
+    <div style="margin-top:8px; padding-top:6px; border-top:1px solid #e2e6ea; font-size:11px; line-height:1.9;">
+      {% if tags.website %}<a href="{{tags.website}}" target="_blank" style="{{link}}">🌐&nbsp;<span style="{{u}}">{{T_website}}</span></a> &nbsp;{% endif %}
+      {% if tags.phone %}<a href="tel:{{tags.phone}}" style="{{link}}">📞&nbsp;<span style="{{u}}">{{tags.phone}}</span></a> &nbsp;{% endif %}
+      {% if tags.email %}<a href="mailto:{{tags.email}}" style="{{link}}">✉️&nbsp;<span style="{{u}}">{{T_email}}</span></a> &nbsp;{% endif %}
+      <a href="{{gmaps}}{{tags.nav_lat}},{{tags.nav_lon}}" target="_blank" style="{{link}}">🧭&nbsp;<span style="{{u}}">{{T_route}}</span></a> &nbsp;
+      <a href="https://www.openstreetmap.org/{{type}}/{{id}}" target="_blank" style="{{linkGrau}}">🗺️&nbsp;<span style="{{u}}">OSM</span></a>
+    </div>
+  </div>
+  {% endif %}
+transform: |
+  // == SETTINGS. Everything worth tuning lives in this block. ================
+  // Points are normalised to 100. The four maxima add up to 100.
+  // Order of importance: sanitary, food supply, eating out, attractions.
+  var CAT = {
+    san: { max: 45, rings: [[150, 1.0], [350, 0.6], [600, 0.3]] },
+    ver: { max: 25, rings: [[150, 1.0], [400, 0.6], [1000, 0.3]] },
+    gas: { max: 18, rings: [[200, 1.0], [500, 0.6], [1000, 0.3]] },
+    att: { max: 12, rings: [[250, 1.0], [550, 0.6], [1000, 0.3]] }
+  };
+  // The BEST_N nearest hits count per category. Three full hits give the
+  // category maximum.
+  var BEST_N = 3;
+
+  // Language of the info card. 'auto' follows the browser, otherwise set one of
+  // de, en, fr, es, it. Anything unknown falls back to English. Only the card is
+  // translated, place names come from OpenStreetMap and stay local.
+  var UI = 'auto';
+
+  // Sanitary on the site itself. These tags together occupy ONE of the three
+  // slots, not all three. Otherwise the map would measure how diligently a
+  // place was tagged rather than what surrounds it.
+  var ONSITE = ['toilets', 'shower', 'drinking_water', 'sanitary_dump_station',
+                'washing_machine', 'laundry'];
+
+  // Quality classes. The rank drives both colour and drawing order.
+  // Rank 0 is on top, rank 6 at the bottom.
+  var CLASSES = [
+    { rank: 0, colour: '#2563C9', camp: ['deluxe'],               starValues: ['5','5S','5.5','4.5','4','4S'] },
+    { rank: 1, colour: '#2E9E52', camp: ['serviced'],             starValues: ['3.5','3','3S'] },
+    { rank: 2, colour: '#A03CB0', camp: ['glamping'],             starValues: [] },
+    { rank: 3, colour: '#E8A33D', camp: ['standard'],             starValues: ['2.5','2','2S'] },
+    { rank: 4, colour: '#D4562B', camp: ['basic'],                starValues: ['1.5','1','1S'] },
+    { rank: 5, colour: '#7A8794', camp: ['pitch','camp_pitch'],   starValues: [] }
+  ];
+  var GREY = '#9AA5B1';   // no information
+
+  // Icon per POI value. All 51 names were checked against the maki and
+  // temaki sprite lists, none is missing.
+  var ICON = {
+    toilets:'maki:toilet', shower:'temaki:shower', drinking_water:'maki:drinking-water',
+    sanitary_dump_station:'temaki:camper_trailer_dump', water_point:'maki:water',
+    public_bath:'maki:swimming', laundry:'maki:laundry',
+    supermarket:'maki:grocery', convenience:'maki:convenience', bakery:'maki:bakery',
+    butcher:'maki:slaughterhouse', greengrocer:'maki:garden-centre', deli:'maki:grocery',
+    dairy:'maki:grocery', cheese:'maki:grocery', seafood:'maki:restaurant-seafood',
+    pastry:'maki:confectionery', confectionery:'maki:confectionery', beverages:'maki:beer',
+    alcohol:'maki:alcohol-shop', health_food:'maki:grocery', frozen_food:'maki:grocery',
+    farm:'maki:farm', grocery:'maki:grocery', general:'maki:shop', kiosk:'maki:shop',
+    marketplace:'maki:shop',
+    restaurant:'maki:restaurant', fast_food:'maki:fast-food', cafe:'maki:cafe',
+    ice_cream:'maki:ice-cream', biergarten:'maki:beer', pub:'maki:bar', bar:'maki:bar',
+    food_court:'maki:restaurant',
+    playground:'maki:playground', miniature_golf:'maki:golf', water_park:'maki:swimming',
+    swimming_area:'maki:swimming', sports_centre:'maki:fitness-centre',
+    fitness_centre:'maki:fitness-centre', fitness_station:'maki:fitness-centre',
+    sauna:'temaki:shower', amusement_arcade:'maki:gaming', adult_gaming_centre:'maki:gaming',
+    beach_resort:'maki:beach', bowling_alley:'maki:bowling-alley', horse_riding:'maki:horse-riding',
+    theme_park:'maki:amusement-park', zoo:'maki:zoo', aquarium:'maki:aquarium'
+  };
+  // Fallback in case a value is ever missing.
+  var ICON_FALLBACK = { san:'maki:toilet', ver:'maki:grocery', gas:'maki:restaurant', att:'maki:playground' };
+
+  // Value to category. The query now returns the bare value and the
+  // classification happens here. No value appears in two categories, so the
+  // mapping is unambiguous.
+  var CATEGORY = {};
+  'toilets shower drinking_water sanitary_dump_station water_point public_bath laundry'
+    .split(' ').forEach(function (k) { CATEGORY[k] = 'san'; });
+  ('marketplace supermarket convenience bakery butcher greengrocer deli dairy cheese ' +
+   'seafood pastry confectionery beverages alcohol health_food frozen_food farm grocery general kiosk')
+    .split(' ').forEach(function (k) { CATEGORY[k] = 'ver'; });
+  'restaurant fast_food cafe ice_cream biergarten pub bar food_court'
+    .split(' ').forEach(function (k) { CATEGORY[k] = 'gas'; });
+  ('playground miniature_golf water_park swimming_area sports_centre fitness_centre ' +
+   'fitness_station sauna amusement_arcade adult_gaming_centre beach_resort bowling_alley ' +
+   'horse_riding theme_park zoo aquarium')
+    .split(' ').forEach(function (k) { CATEGORY[k] = 'att'; });
+
+  // == Machinery from here on ================================================
+  var UI_LANGS = ['de', 'en', 'fr', 'es', 'it'];
+  function uiLanguage() {
+    if (UI !== 'auto') return UI_LANGS.indexOf(UI) >= 0 ? UI : 'en';
+    var tag = '';
+    try {
+      tag = (typeof navigator !== 'undefined' &&
+             ((navigator.languages && navigator.languages[0]) || navigator.language)) || '';
+    } catch (e) { tag = ''; }
+    tag = String(tag).slice(0, 2).toLowerCase();
+    return UI_LANGS.indexOf(tag) >= 0 ? tag : 'en';
+  }
+  var LG = uiLanguage();
+
+  var CAMP = { camp_site: 1, caravan_site: 1 };
+  var MAXR = 0;
+  Object.keys(CAT).forEach(function (k) {
+    var r = CAT[k].rings[CAT[k].rings.length - 1][0];
+    if (r > MAXR) MAXR = r;
+  });
+
+  function ringFactor(rings, d) {
+    for (var i = 0; i < rings.length; i++) if (d <= rings[i][0]) return rings[i][1];
+    return 0;
+  }
+  function haversine(a, b) {                        // [lon,lat] -> metres
+    var R = 6371008.8, rad = Math.PI / 180;
+    var dLat = (b[1] - a[1]) * rad, dLon = (b[0] - a[0]) * rad;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  // Multipolygon relations arrive as a GeometryCollection. Without this step
+  // every evaluation throws and the map stays empty.
+  function flatten(f) {
+    var g = f.geometry;
+    if (!g || g.type !== 'GeometryCollection') return;
+    var parts = [];
+    (g.geometries || []).forEach(function (x) {
+      if (x.type === 'Polygon') parts.push(x.coordinates);
+      else if (x.type === 'MultiPolygon') x.coordinates.forEach(function (r) { parts.push(r); });
+    });
+    if (parts.length) f.geometry = { type: 'MultiPolygon', coordinates: parts };
+  }
+  function vertices(g) {                            // every support point
+    var out = [];
+    (function walk(c) {
+      if (!c) return;
+      if (typeof c[0] === 'number') { out.push(c); return; }
+      c.forEach(walk);
+    })(g.coordinates);
+    return out;
+  }
+  function polygonRings(g) {
+    if (!g) return [];
+    if (g.type === 'Polygon') return g.coordinates;
+    if (g.type === 'MultiPolygon') {
+      var o = []; g.coordinates.forEach(function (p) { p.forEach(function (r) { o.push(r); }); });
+      return o;
+    }
+    return [];
+  }
+  function pointInRing(pt, ring) {
+    var x = pt[0], y = pt[1], inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function normalise(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+
+  // A point that reliably sits INSIDE the object. First the centroid of the
+  // vertices, else the centre of the bounding box, else the first vertex.
+  // This point carries the navigation links.
+  function navPoint(f) {
+    var g = f.geometry;
+    if (g.type === 'Point') return g.coordinates;
+    var v = vertices(g);
+    if (!v.length) return null;
+    var sx = 0, sy = 0, minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (var i = 0; i < v.length; i++) {
+      sx += v[i][0]; sy += v[i][1];
+      if (v[i][0] < minx) minx = v[i][0];
+      if (v[i][0] > maxx) maxx = v[i][0];
+      if (v[i][1] < miny) miny = v[i][1];
+      if (v[i][1] > maxy) maxy = v[i][1];
+    }
+    var rs = polygonRings(g);
+    var candidatePoints = [[sx / v.length, sy / v.length], [(minx + maxx) / 2, (miny + maxy) / 2]];
+    for (var k = 0; k < candidatePoints.length; k++) {
+      for (var r = 0; r < rs.length; r++) if (pointInRing(candidatePoints[k], rs[r])) return candidatePoints[k];
+    }
+    return candidatePoints[1] || v[0];
+  }
+
+  function classOf(p) {
+    for (var i = 0; i < CLASSES.length; i++) {
+      if (p.camp_site && CLASSES[i].camp.indexOf(p.camp_site) >= 0) return CLASSES[i];
+    }
+    for (var j = 0; j < CLASSES.length; j++) {
+      if (p.stars && CLASSES[j].starValues.indexOf(String(p.stars)) >= 0) return CLASSES[j];
+    }
+    return { rank: 6, colour: GREY };
+  }
+  function starLabel(p) {                              // "4S" and "4.5" become "4+"
+    var s = p.stars ? String(p.stars) : '';
+    var m = s.match(/^([1-5])(?:\.5|S|\.0)?$/i);
+    if (!m) return '';
+    return /(\.5|S)$/i.test(s) ? m[1] + '+' : m[1];
+  }
+
+  export default function score(data) {
+    var camps = [], pois = [], others = [];
+    data.features.forEach(function (f) {
+      flatten(f);
+      var p = f.properties || {};
+      if (!f.geometry || !f.geometry.coordinates) return;
+      if (p.v && CATEGORY[p.v]) {
+        p.c = CATEGORY[p.v];
+        if (p.o) { p.opening_hours = p.o; }
+        p.ic = ICON[p.v] || ICON_FALLBACK[p.c];
+        p.lg = LG;
+        var xy = vertices(f.geometry)[0];
+        p.nav_lat = Math.round(xy[1] * 1e6) / 1e6;
+        p.nav_lon = Math.round(xy[0] * 1e6) / 1e6;
+        pois.push({ k: p.c, xy: xy });
+        others.push(f);
+        return;
+      }
+      if (CAMP[p.tourism]) camps.push(f); else others.push(f);
+    });
+
+    // Grid over the POI. Without it the cost grows with camps times POI.
+    var CELL = MAXR / 111320;
+    var grid = {};
+    pois.forEach(function (p) {
+      var key = Math.floor(p.xy[0] / CELL) + ':' + Math.floor(p.xy[1] / CELL);
+      (grid[key] || (grid[key] = [])).push(p);
+    });
+    function candidates(minx, miny, maxx, maxy) {
+      var out = [], seen = {};
+      for (var gx = Math.floor(minx / CELL); gx <= Math.floor(maxx / CELL); gx++)
+        for (var gy = Math.floor(miny / CELL); gy <= Math.floor(maxy / CELL); gy++) {
+          var k = gx + ':' + gy;
+          if (seen[k] || !grid[k]) continue;
+          seen[k] = 1;
+          out = out.concat(grid[k]);
+        }
+      return out;
+    }
+
+    camps.forEach(function (c) {
+      var p = c.properties;
+      var verts = vertices(c.geometry);
+      var acc = { san: [], ver: [], gas: [], att: [] };
+      for (var t = 0; t < ONSITE.length; t++) {
+        var v = p[ONSITE[t]];
+        if (v && v !== 'no') { acc.san.push(1.0); break; }   // exactly ONE slot
+      }
+      var minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+      for (var i = 0; i < verts.length; i++) {
+        if (verts[i][0] < minx) minx = verts[i][0];
+        if (verts[i][0] > maxx) maxx = verts[i][0];
+        if (verts[i][1] < miny) miny = verts[i][1];
+        if (verts[i][1] > maxy) maxy = verts[i][1];
+      }
+      var padY = MAXR / 111320;
+      var padX = padY / Math.max(0.2, Math.cos(miny * Math.PI / 180));
+      candidates(minx - padX, miny - padY, maxx + padX, maxy + padY).forEach(function (q) {
+        var min = Infinity;
+        for (var i = 0; i < verts.length; i++) {
+          var d = haversine(verts[i], q.xy);
+          if (d < min) min = d;
+        }
+        var fk = ringFactor(CAT[q.k].rings, min);
+        if (fk > 0) acc[q.k].push(fk);
+      });
+      var total = 0;
+      Object.keys(CAT).forEach(function (k) {
+        var sum = acc[k].sort(function (a, b) { return b - a; })
+                          .slice(0, BEST_N)
+                          .reduce(function (s, x) { return s + x; }, 0);
+        var share = Math.min(1, sum / BEST_N);
+        p['score_' + k] = Math.round(share * CAT[k].max * 10) / 10;
+        total += share * CAT[k].max;
+      });
+      p.score = Math.round(total);
+      p.lg = LG;
+      var st = classOf(p);
+      p.col = st.colour;
+      p.qr  = st.rank;
+      p.sk = st.rank * 1000 + (100 - p.score);   // labels: the smaller wins placement
+      p.zk = (6 - st.rank) * 1000 + p.score;     // symbols: the larger is drawn on top
+      var z = starLabel(p);
+      if (z) p.st = z;
+      var np = navPoint(c);
+      if (np) {
+        p.nav_lat = Math.round(np[1] * 1e6) / 1e6;
+        p.nav_lon = Math.round(np[0] * 1e6) / 1e6;
+      }
+      // Title icon. The larger variant wins.
+      // Motorhome beats tent beats wild camping.
+      var motorhome = p.tourism === 'caravan_site' || p.caravans === 'yes' ||
+               p.caravans === 'designated' || p.caravans === 'only';
+      var tent = p.tents && p.tents !== 'no';
+      var wild = p.backcountry === 'yes';
+      p.kind = motorhome ? 'motorhome' : (tent ? 'tent' : (wild ? 'wild' : 'camp'));
+    });
+
+    // Point objects that sit inside another camp polygon and mean the same
+    // place are drawn once. A motorhome harbour INSIDE a campsite with its own
+    // name stays, that is a separate offer.
+    var areas = camps.filter(function (c) { return polygonRings(c.geometry).length; });
+    var keep = [], removed = 0;
+    camps.forEach(function (c) {
+      if (c.geometry.type === 'Point') {
+        var xy = c.geometry.coordinates, nA = normalise(c.properties.name);
+        for (var i = 0; i < areas.length; i++) {
+          var rs = polygonRings(areas[i].geometry), inside = false;
+          for (var j = 0; j < rs.length; j++) if (pointInRing(xy, rs[j])) { inside = true; break; }
+          if (!inside) continue;
+          var nB = normalise(areas[i].properties.name);
+          if (!nA || !nB || nA === nB || nA.indexOf(nB) >= 0 || nB.indexOf(nA) >= 0) { removed++; return; }
+        }
+      }
+      keep.push(c);
+    });
+
+    // Drawing order for areas. Good quality last, therefore on top.
+    keep.sort(function (a, b) { return b.properties.sk - a.properties.sk; });
+    data.features = others.concat(keep);
+    data.duplicates = removed;
+    return data;
+  }
+style:
+  layers:
+
+    - id: camp-area
+      type: fill
+      minzoom: 12.3
+      filter: ["all", ["has", "score"], ["!=", ["geometry-type"], "Point"]]
+      paint:
+        fill-color: ["get", "col"]
+        fill-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, ["interpolate", ["linear"], ["get", "score"], 0, 0.05, 100, 0.22]]
+
+    - id: camp-outline
+      type: line
+      minzoom: 12.3
+      filter: ["all", ["has", "score"], ["!=", ["geometry-type"], "Point"]]
+      paint:
+        line-color: ["get", "col"]
+        line-width: ["interpolate", ["linear"], ["get", "score"], 0, 1, 100, 3]
+        line-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, 1]
+
+    - id: camp-hitarea
+      type: symbol
+      maxzoom: 12.8
+      filter: ["has", "score"]
+      layout:
+        icon-image: "maki:circle"
+        icon-size: ["interpolate", ["linear"], ["zoom"], 8, ["+", ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.3, 100, 0.8], ["case", ["has", "st"], 0.54, 0]], 0.55], 11, ["+", ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.26, 100, 0.71], ["case", ["has", "st"], 0.49, 0]], 0.55], 12.6, ["+", ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.2, 100, 0.57], ["case", ["has", "st"], 0.43, 0]], 0.55]]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["get", "zk"]
+      paint:
+        icon-opacity: 0
+
+    - id: camp-star
+      type: symbol
+      maxzoom: 12.8
+      filter: ["all", ["has", "score"], ["has", "st"]]
+      layout:
+        icon-image: "maki:star"
+        icon-size: ["interpolate", ["linear"], ["zoom"], 8, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.615, 100, 1.64], ["case", ["has", "st"], 1.107, 0]], 11, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.533, 100, 1.455], ["case", ["has", "st"], 1.004, 0]], 12.6, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.41, 100, 1.168], ["case", ["has", "st"], 0.881, 0]]]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["get", "zk"]
+      paint:
+        icon-color: ["get", "col"]
+        icon-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 1, 12.7, 0]
+        icon-halo-color: "#ffffff"
+        icon-halo-width: 1
+
+    - id: camp-dot
+      type: symbol
+      maxzoom: 12.8
+      filter: ["has", "score"]
+      layout:
+        icon-image: "maki:circle"
+        icon-size: ["interpolate", ["linear"], ["zoom"], 8, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.3, 100, 0.8], ["case", ["has", "st"], 0.54, 0]], 11, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.26, 100, 0.71], ["case", ["has", "st"], 0.49, 0]], 12.6, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.2, 100, 0.57], ["case", ["has", "st"], 0.43, 0]]]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["get", "zk"]
+      paint:
+        icon-color: ["get", "col"]
+        icon-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 1, 12.7, 0]
+        icon-halo-color: "#ffffff"
+        icon-halo-width: 2
+
+    - id: camp-stars
+      type: symbol
+      maxzoom: 12.8
+      filter: ["all", ["has", "score"], ["has", "st"]]
+      layout:
+        text-field: ["get", "st"]
+        text-font: ["Noto Sans Bold"]
+        text-size: ["interpolate", ["linear"], ["zoom"], 8, ["*", 16.9, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.3, 100, 0.8], ["case", ["has", "st"], 0.54, 0]]], 11, ["*", 16.9, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.26, 100, 0.71], ["case", ["has", "st"], 0.49, 0]]], 12.6, ["*", 16.9, ["max", ["interpolate", ["linear"], ["get", "score"], 0, 0.2, 100, 0.57], ["case", ["has", "st"], 0.43, 0]]]]
+        text-anchor: "center"
+        text-offset: [0, 0]
+        text-overlap: "always"
+        text-ignore-placement: true
+        symbol-sort-key: ["get", "zk"]
+      paint:
+        text-color: "#ffffff"
+        text-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 1, 12.7, 0]
+
+    - id: camp-disc
+      type: symbol
+      minzoom: 12.3
+      filter: ["has", "score"]
+      layout:
+        icon-image: "maki:circle"
+        icon-size: ["interpolate", ["linear"], ["zoom"], 12.3, ["interpolate", ["linear"], ["get", "score"], 0, 0.62, 100, 1.05], 16, ["interpolate", ["linear"], ["get", "score"], 0, 0.72, 100, 1.2]]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["get", "zk"]
+      paint:
+        icon-color: "#ffffff"
+        icon-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, 1]
+
+    - id: camp-tent
+      type: symbol
+      minzoom: 12.3
+      filter: ["has", "score"]
+      layout:
+        icon-image: "maki:campsite"
+        icon-size: ["interpolate", ["linear"], ["zoom"], 12.3, ["interpolate", ["linear"], ["get", "score"], 0, 0.44, 100, 0.76], 16, ["interpolate", ["linear"], ["get", "score"], 0, 0.51, 100, 0.87]]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["get", "zk"]
+      paint:
+        icon-color: ["get", "col"]
+        icon-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, 1]
+        icon-halo-color: "#ffffff"
+        icon-halo-width: 2
+
+    - id: poi-disc
+      type: symbol
+      minzoom: 12.3
+      filter: ["has", "c"]
+      layout:
+        icon-image: "maki:circle"
+        icon-size: ["interpolate", ["linear"], ["zoom"], 12.3, 0.6, 15, 0.66, 18, 0.74]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["match", ["get", "c"], "san", 3, "ver", 2, "gas", 1, 0]
+      paint:
+        icon-color: "#ffffff"
+        icon-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, 1]
+
+    - id: poi-icon
+      type: symbol
+      minzoom: 12.3
+      filter: ["has", "c"]
+      layout:
+        icon-image: ["get", "ic"]
+        icon-size: ["interpolate", ["linear"], ["zoom"], 12.3, 0.4, 15, 0.45, 18, 0.52]
+        icon-overlap: "always"
+        icon-ignore-placement: true
+        symbol-sort-key: ["match", ["get", "c"], "san", 3, "ver", 2, "gas", 1, 0]
+      paint:
+        icon-color: ["match", ["get", "c"], "san", "#734a08", "ver", "#ac39ac", "gas", "#C77400", "att", "#0d7a52", "#9AA5B1"]
+        icon-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, 1]
+
+    - id: camp-label
+      type: symbol
+      minzoom: 12.3
+      filter: ["all", ["has", "score"], ["has", "name"]]
+      layout:
+        symbol-sort-key: ["get", "sk"]
+        text-field: ["get", "name"]
+        text-font: ["Noto Sans Bold"]
+        text-size: ["interpolate", ["linear"], ["get", "score"], 0, 9.5, 100, 12.5]
+        text-offset: [0, 1.1]
+        text-anchor: "top"
+        text-optional: true
+      paint:
+        text-color: "#1c2b3a"
+        text-halo-color: "#ffffff"
+        text-halo-width: 2
+        text-opacity: ["interpolate", ["linear"], ["zoom"], 12.3, 0, 12.7, 1]
+---
+[out:json][timeout:120][bbox:{{bbox}}];
+(nwr["tourism"="camp_site"]; nwr["tourism"="caravan_site"];)->.camps;
+(.camps; >;)->.cd;
+node.cd->.probe;
+nwr[~"^(amenity|shop|leisure|tourism)$"~"^(toilets|shower|drinking_water|sanitary_dump_station|water_point|public_bath|marketplace|restaurant|fast_food|cafe|ice_cream|biergarten|pub|bar|food_court|laundry|supermarket|convenience|bakery|butcher|greengrocer|deli|dairy|cheese|seafood|pastry|confectionery|beverages|alcohol|health_food|frozen_food|farm|grocery|general|kiosk|playground|miniature_golf|water_park|swimming_area|sports_centre|fitness_centre|fitness_station|sauna|amusement_arcade|adult_gaming_centre|beach_resort|bowling_alley|horse_riding|theme_park|zoo|aquarium)$"](around.probe:1000)->.p0;
+(.p0; - .camps;)->.poi;
+nwr.poi["tourism"~"^(theme_park|zoo|aquarium)$"]->.pt;
+nwr.poi["leisure"~"^(playground|miniature_golf|water_park|swimming_area|sports_centre|fitness_centre|fitness_station|sauna|amusement_arcade|adult_gaming_centre|beach_resort|bowling_alley|horse_riding)$"]->.pl;
+nwr.poi["amenity"~"^(restaurant|fast_food|cafe|ice_cream|biergarten|pub|bar|food_court)$"]->.pg;
+nwr.poi["shop"~"^(laundry|supermarket|convenience|bakery|butcher|greengrocer|deli|dairy|cheese|seafood|pastry|confectionery|beverages|alcohol|health_food|frozen_food|farm|grocery|general|kiosk)$"]->.ps;
+nwr.poi["amenity"~"^(toilets|shower|drinking_water|sanitary_dump_station|water_point|public_bath|marketplace)$"]->.pn;
+.camps out geom;
+.pt convert node ::id=id(), ::geom=center(geom()), n=t["name"], v=t["tourism"], o=t["opening_hours"];
+out geom;
+.pl convert node ::id=id(), ::geom=center(geom()), n=t["name"], v=t["leisure"], o=t["opening_hours"];
+out geom;
+.pg convert node ::id=id(), ::geom=center(geom()), n=t["name"], v=t["amenity"], o=t["opening_hours"];
+out geom;
+.ps convert node ::id=id(), ::geom=center(geom()), n=t["name"], v=t["shop"], o=t["opening_hours"];
+out geom;
+.pn convert node ::id=id(), ::geom=center(geom()), n=t["name"], v=t["amenity"], o=t["opening_hours"];
+out geom;
